@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Text-to-Speech and LUIS Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        button, select, input {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+        }
+
+        button {
+            background-color: #0078d4;
+            color: white;
+        }
+
+        button:hover {
+            background-color: #005fa3;
+        }
+
+        select, input {
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Azure Text-to-Speech and LUIS Demo</h1>
+        
+        <label for="voiceSelect">Select Voice:</label>
+        <select id="voiceSelect">
+            <option value="en-US-AriaNeural">English (US) - Aria</option>
+            <option value="hi-IN-NeerjaNeural">Hindi - Neerja</option>
+            <option value="ta-IN-AadhilNeural">Tamil - Aadhil</option>
+            <option value="te-IN-AditiNeural">Telugu - Aditi</option>
+        </select>
+
+        <label for="userInput">Enter Text or Command:</label>
+        <input type="text" id="userInput" placeholder="Type something...">
+        
+        <button id="speechButton">Click to Hear Text</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.19.0/dist/microsoft.cognitiveservices.speech.sdk.js"></script>
+    <script>
+        const subscriptionKey = "7pWY1g5Ku86E8loU2ldQ3DlHeJaZOzKjsHIltWrvDwHxn4fOJKjRJQQJ99BBACGhslBXJ3w3AAAYACOGecJx"; // Replace with your Speech API key
+        const region = "centralindia"; // Replace with your Speech API region
+        const luisAppId = "https://languemoosha.cognitiveservices.azure.com/"; // Replace with your LUIS App ID
+        const luisKey = "FLXiSHvzMuiFlUwZFi80lz6HoCFr1FTX0ObNXcsUE7nLV5qopR5wJQQJ99BBACGhslBXJ3w3AAAaACOGHIFp"; // Replace with your LUIS subscription key
+        const luisEndpoint = `https://languemoosha.cognitiveservices.azure.com/`;
+
+        // Initialize the Azure Speech SDK
+        const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(subscriptionKey, region);
+
+        // Function to send text to LUIS for understanding
+        async function getLUISIntent(userText) {
+            const response = await fetch(luisEndpoint + encodeURIComponent(userText));
+            const data = await response.json();
+            console.log(data);
+
+            // Return the LUIS top intent
+            if (data.topScoringIntent) {
+                return data.topScoringIntent.intent;
+            }
+            return null;
+        }
+
+        document.getElementById("speechButton").onclick = function () {
+            const userInput = document.getElementById("userInput").value;
+            
+            // First, process the user input with LUIS to identify intent
+            getLUISIntent(userInput).then((intent) => {
+                const text = intent ? `You said: ${userInput}. Intent: ${intent}` : `Sorry, I couldn't understand your input.`;
+                console.log(text); // For debugging
+
+                // Get the selected voice from the dropdown
+                const selectedVoice = document.getElementById("voiceSelect").value;
+                speechConfig.speechSynthesisVoiceName = selectedVoice; // Set selected voice
+
+                // Initialize the speech synthesizer with the selected voice
+                const synthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig);
+
+                synthesizer.speakTextAsync(
+                    text,
+                    function (result) {
+                        if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
+                            console.log("Successfully synthesized the message");
+                        } else {
+                            console.error("Speech synthesis failed: " + result.errorDetails);
+                        }
+                    },
+                    function (error) {
+                        console.error("Error: " + error);
+                    }
+                );
+            });
+        };
+    </script>
+</body>
+</html>

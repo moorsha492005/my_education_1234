@@ -3,117 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Azure Text-to-Speech and LUIS Demo</title>
+    <title>Azure Educational Assistant</title>
+    <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
     <style>
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to right, #ff7e5f, #feb47b);
+            color: #333;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
+            justify-content: space-between;
         }
 
-        .container {
+        .content {
+            width: 100%;
+            max-width: 900px;
+            padding: 20px;
+            margin: auto;
+            flex-grow: 1;
+        }
+
+        h2 {
+            color: #fff;
             text-align: center;
+            font-size: 3rem;
         }
 
-        button, select, input {
-            padding: 10px 20px;
-            font-size: 16px;
-            margin: 10px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
         }
 
         button {
-            background-color: #0078d4;
+            padding: 12px 25px;
+            border: none;
+            background: #0078d4;
             color: white;
-        }
-
-        button:hover {
-            background-color: #005fa3;
-        }
-
-        select, input {
+            cursor: pointer;
+            border-radius: 5px;
             font-size: 16px;
+            width: 100%;
+        }
+
+        input, select {
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 16px;
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #0078d4;
+            color: white;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Azure Text-to-Speech and LUIS Demo</h1>
-        
-        <label for="voiceSelect">Select Voice:</label>
-        <select id="voiceSelect">
-            <option value="en-US-AriaNeural">English (US) - Aria</option>
-            <option value="hi-IN-NeerjaNeural">Hindi - Neerja</option>
-            <option value="ta-IN-AadhilNeural">Tamil - Aadhil</option>
-            <option value="te-IN-AditiNeural">Telugu - Aditi</option>
-        </select>
 
-        <label for="userInput">Enter Text or Command:</label>
-        <input type="text" id="userInput" placeholder="Type something...">
-        
-        <button id="speechButton">Click to Hear Text</button>
+    <div class="content">
+        <h2>Azure Educational Assistant</h2>
+
+        <!-- Speech-to-Text Section -->
+        <div class="section">
+            <h3>Speech-to-Text</h3>
+            <label for="languageSelect">Select Language:</label>
+            <select id="languageSelect">
+                <option value="en-US">English</option>
+                <option value="hi-IN">Hindi</option>
+                <option value="ta-IN">Tamil</option>
+                <option value="te-IN">Telugu</option>
+                <option value="kn-IN">Kannada</option>
+                <option value="mr-IN">Marathi</option>
+            </select>
+            <br><br>
+            <button onclick="startSpeechToText()">Start Speaking</button>
+            <p>Recognized Text: <span id="result"></span></p>
+        </div>
+
+        <!-- LUIS Intent Analysis -->
+        <div class="section">
+            <h3>LUIS Intent Analysis</h3>
+            <p>Detected Intent: <span id="intent"></span></p>
+        </div>
+
+        <!-- Text-to-Speech -->
+        <div class="section">
+            <h3>Text-to-Speech</h3>
+            <input type="text" id="ttsInput" placeholder="Enter text to speak">
+            <button onclick="convertTextToSpeech()">Speak</button>
+        </div>
+
+        <!-- Image Analysis -->
+        <div class="section">
+            <h3>Image Analysis</h3>
+            <input type="file" id="imageUpload" accept="image/*" onchange="analyzeImage(event)">
+            <p>Image Analysis Result: <span id="visionResult"></span></p>
+        </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/microsoft-cognitiveservices-speech-sdk@1.19.0/dist/microsoft.cognitiveservices.speech.sdk.js"></script>
+    <div class="footer">
+        <p>&copy; 2025 Azure Educational Assistant | All rights reserved</p>
+    </div>
+
     <script>
-        const subscriptionKey = "7pWY1g5Ku86E8loU2ldQ3DlHeJaZOzKjsHIltWrvDwHxn4fOJKjRJQQJ99BBACGhslBXJ3w3AAAYACOGecJx"; // Replace with your Speech API key
-        const region = "centralindia"; // Replace with your Speech API region
-        const luisAppId = "https://languemoosha.cognitiveservices.azure.com/"; // Replace with your LUIS App ID
-        const luisKey = "FLXiSHvzMuiFlUwZFi80lz6HoCFr1FTX0ObNXcsUE7nLV5qopR5wJQQJ99BBACGhslBXJ3w3AAAaACOGHIFp"; // Replace with your LUIS subscription key
-        const luisEndpoint = `https://languemoosha.cognitiveservices.azure.com/`;
+        const config = {
+            SPEECH_KEY: "7pWY1g5Ku86E8loU2ldQ3DlHeJaZOzKjsHIltWrvDwHxn4fOJKjRJQQJ99BBACGhslBXJ3w3AAAYACOGecJx",
+            SPEECH_REGION: "centralindia",
+            LUIS_ENDPOINT: "https://languemoosha.cognitiveservices.azure.com/",
+            LUIS_APP_ID: "/subscriptions/33ef2a8b-43e1-4790-82d8-459bd4a58c1f/resourceGroups/Budget-RG/providers/Microsoft.CognitiveServices/accounts/languemoosha",
+            LUIS_KEY: "8ww51lODzMf0S6LVeJkNHios81rojLcpPkBFm1k6zonEOtgK7IejJQQJ99BBACGhslBXJ3w3AAAaACOGPM8z",
+            VISION_ENDPOINT: "https://education123sunni.cognitiveservices.azure.com/",
+            VISION_KEY: "8fYTzVTOQnEQPJf1be97QlkcZ1IBiGPPPLgMfEO7W4fyol5qRpqfJQQJ99BCACGhslBXJ3w3AAAFACOGAvQ3"
+        };
 
-        // Initialize the Azure Speech SDK
-        const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(subscriptionKey, region);
+        async function startSpeechToText() {
+            try {
+                let language = document.getElementById("languageSelect").value;
+                
+                let speechConfig = SpeechSDK.SpeechConfig.fromSubscription(config.SPEECH_KEY, config.SPEECH_REGION);
+                speechConfig.speechRecognitionLanguage = language;
+                let audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+                let recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
 
-        // Function to send text to LUIS for understanding
-        async function getLUISIntent(userText) {
-            const response = await fetch(luisEndpoint + encodeURIComponent(userText));
-            const data = await response.json();
-            console.log(data);
+                recognizer.recognizeOnceAsync(async (result) => {
+                    if (result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+                        let text = result.text;
+                        document.getElementById("result").innerText = text;
+                        analyzeIntent(text, language);
+                    } else {
+                        alert("Speech not recognized. Try again!");
+                    }
+                });
 
-            // Return the LUIS top intent
-            if (data.topScoringIntent) {
-                return data.topScoringIntent.intent;
+            } catch (error) {
+                console.error("Error during speech recognition:", error);
             }
-            return null;
         }
 
-        document.getElementById("speechButton").onclick = function () {
-            const userInput = document.getElementById("userInput").value;
+        async function analyzeIntent(text, language) {
+            try {
+                let endpoint = '${config.LUIS_ENDPOINT}/luis/prediction/v3.0/apps/${config.LUIS_APP_ID}/slots/production/predict?subscription-key=${config.LUIS_KEY}&query=${encodeURIComponent(text)}&language=${language}';
+                console.log("https://languemoosha.cognitiveservices.azure.com/")
+                let response = await axios.get(endpoint);
+                let intent = response.data.prediction.topIntent;
+                document.getElementById("intent").innerText = intent;
+
+            } catch (error) {
+                console.error("LUIS Error:", error);
+                document.getElementById("intent").innerText = "Error analyzing intent.";
+            }
+        }
+
+        async function analyzeImage(event) {
+            let file = event.target.files[0];
+            if (!file) return;
             
-            // First, process the user input with LUIS to identify intent
-            getLUISIntent(userInput).then((intent) => {
-                const text = intent ? `You said: ${userInput}. Intent: ${intent}` : `Sorry, I couldn't understand your input.`;
-                console.log(text); // For debugging
+            try {
+                let reader = new FileReader();
 
-                // Get the selected voice from the dropdown
-                const selectedVoice = document.getElementById("voiceSelect").value;
-                speechConfig.speechSynthesisVoiceName = selectedVoice; // Set selected voice
+                reader.onloadend = async function () {
+                    try {
+                        let response = await axios.post('${config.VISION_ENDPOINT}/vision/v3.1/analyze', reader.result, {
+                            headers: {
+                                "Ocp-Apim-Subscription-Key": config.VISION_KEY,
+                                "Content-Type": "application/octet-stream"
+                            },
+                            params: { "visualFeatures": "Description" }
+                        });
 
-                // Initialize the speech synthesizer with the selected voice
-                const synthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig);
-
-                synthesizer.speakTextAsync(
-                    text,
-                    function (result) {
-                        if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
-                            console.log("Successfully synthesized the message");
-                        } else {
-                            console.error("Speech synthesis failed: " + result.errorDetails);
-                        }
-                    },
-                    function (error) {
-                        console.error("Error: " + error);
+                        let description = response.data.description.captions[0].text;
+                        document.getElementById("visionResult").innerText = description;
+                    } catch (error) {
+                        console.error("Vision API Error:", error);
+                        document.getElementById("visionResult").innerText = "Error analyzing image.";
                     }
-                );
-            });
-        };
+                };
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                console.error("Error with image analysis:", error);
+            }
+        }
+
+        function convertTextToSpeech() {
+            let text = document.getElementById("ttsInput").value;
+            if (!text) {
+                alert("Please enter text to convert to speech.");
+                return;
+            }
+
+            let speechConfig = SpeechSDK.SpeechConfig.fromSubscription(config.SPEECH_KEY, config.SPEECH_REGION);
+            let synthesizer = new SpeechSDK.SpeechSynthesizer(speechConfig);
+            synthesizer.speakTextAsync(text);
+        }
     </script>
+
 </body>
 </html>
